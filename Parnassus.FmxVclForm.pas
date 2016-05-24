@@ -83,6 +83,8 @@ begin
     Self.Left := FForm.Left;
     Self.Position := FmxToVclFormPosition(FForm.Position);
     Self.WindowState := FForm.WindowState;
+    //I experienced issues for instance with poScreenCenter
+    FForm.Position := TFormPosition.poDefaultPosOnly;
 end;
 
 procedure TFmxVclForm.FireMonkeyContainerCreateFMXForm(var Form: TCommonCustomForm);
