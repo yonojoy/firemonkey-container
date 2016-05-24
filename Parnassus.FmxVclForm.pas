@@ -23,6 +23,9 @@ uses
 type
     TFmxFormClass = class of TCommonCustomForm;
 
+    { Usage:
+      TFmxVclForm.CreateNew(Owner, TOriginalForm).Show;
+    --------------------------------------------------------------------------------------------------------------}
     TFmxVclForm = class(Vcl.Forms.TCustomForm)
     private
         FFormClass: TFmxFormClass;
@@ -38,20 +41,40 @@ type
         function ShowModal: Integer; override;
         procedure WndProc(var msg : TMessage); override;
 
-        class function FmxToVclBorderStyle(AStyle: TFMXFormBorderStyle): TFormBorderStyle;
-        class function FmxToVclFormPosition(APos: TFormPosition): TPosition;
         constructor Create(AOwner: TComponent); override;
     public
         property FireMonkeyForm: TCommonCustomForm read PropGetFireMonkeyForm;
         constructor CreateNew(AOwner: TComponent; FormClass: TFmxFormClass); reintroduce; virtual;
     public
         class function FmxToVclForm(AFmxForm: TCommonCustomForm): TFmxVclForm;
+        class function FmxToVclBorderStyle(AStyle: TFMXFormBorderStyle): TFormBorderStyle;
+        class function FmxToVclFormPosition(APos: TFormPosition): TPosition;
     end;
+
+
+    { For forms, that need to exhibit interfaces.
+      Usage:
+
+      type
+        TFmxVclFormFoo = class(TInterfacedFmxVclForm<IFoo>, IFoo)
+            property Interface1: IFoo read PropGetInterface1 implements IFoo;
+        end;
+
+      TFmxVclFormFoo.CreateNew(Owner, TOriginalForm).Show;
+
+      coverage: http://stackoverflow.com/questions/37408689/generic-parameter-to-define-the-interface-the-generic-class-is-implementing
+    --------------------------------------------------------------------------------------------------------------}
+    TInterfacedFmxVclForm<T: IInterface> = class(TFmxVclForm)
+        function PropGetInterface1(): T;
+        property Interface1: T read PropGetInterface1;
+    end;
+
 
 implementation
 
 uses
     SysUtils,
+    TypInfo,
     Vcl.Controls;
 
 constructor TFmxVclForm.Create(AOwner: TComponent);
@@ -136,6 +159,7 @@ begin
 end;
 
 
+//Workaround for issue #12 (Caret is gone after switching applications via taskbar)
 procedure TFmxVclForm.WMActivate(var Msg: TWMActivate);
 begin
   if not (GetWindowLong(Handle, GWL_STYLE) and WS_CHILD = WS_CHILD) and (FormStyle <> fsMDIForm) then
@@ -166,5 +190,15 @@ begin
   if (ModalResult = 0) and (Assigned(FForm)) and (FForm.ModalResult <> 0) then
     ModalResult := FForm.ModalResult;
 end;
+
+{ TInterfacedFmxVclForm<T> }
+
+function TInterfacedFmxVclForm<T>.PropGetInterface1: T;
+begin
+    //see http://stackoverflow.com/questions/4418278/use-of-supports-function-with-generic-interface-type
+    if not Supports(PropGetFireMonkeyForm(), GetTypeData(TypeInfo(T))^.Guid, Result) then
+      raise Exception.Create('Interface not implemented');
+end;
+
 
 end.
