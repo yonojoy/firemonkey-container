@@ -18,6 +18,7 @@ uses
     Winapi.Windows,
     System.Classes,
     Vcl.StdCtrls,
+    Vcl.AppEvnts,
     Vcl.Forms;
 
 type
@@ -30,19 +31,23 @@ type
     private
         FFormClass: TFmxFormClass;
         FForm: TCommonCustomForm;
+        FAppEvents: TApplicationEvents;
     protected
         FFireMonkeyContainer: TFireMonkeyContainer;
         procedure FireMonkeyContainerCreateFMXForm(var Form: TCommonCustomForm);
         procedure FireMonkeyContainerDestroyFMXForm(var Form: TCommonCustomForm;
           var Action: TCloseHostedFMXFormAction);
         function PropGetFireMonkeyForm: TCommonCustomForm;
+
         procedure WMActivate(var Msg: TWMActivate); message WM_ACTIVATE;
+        //procedure WndProc(var msg : TMessage); override;
+        procedure FormIdle(Sender: TObject; var Done: Boolean);
 
-        function ShowModal: Integer; override;
-        procedure WndProc(var msg : TMessage); override;
-
+        {$HINTS OFF}
         constructor Create(AOwner: TComponent); override;
+        {$HINTS ON}
     public
+        function ShowModal: Integer; override;
         property FireMonkeyForm: TCommonCustomForm read PropGetFireMonkeyForm;
         constructor CreateNew(AOwner: TComponent; FormClass: TFmxFormClass); reintroduce; virtual;
     public
@@ -108,6 +113,10 @@ begin
     Self.WindowState := FForm.WindowState;
     //I experienced issues for instance with poScreenCenter
     FForm.Position := TFormPosition.poDefaultPosOnly;
+
+    //create TApplicationEvents component to be able to respond to OnIdle (for ShowModal)
+    FAppEvents := TApplicationEvents.Create(Self);
+    FAppEvents.OnIdle := FormIdle;
 end;
 
 procedure TFmxVclForm.FireMonkeyContainerCreateFMXForm(var Form: TCommonCustomForm);
@@ -169,7 +178,6 @@ begin
     //FForm.Active := (Msg.Active <> WA_INACTIVE);
 end;
 
-
 //This function and TFmxVclForm.WndProc play together to allow ShowModal of the VCL form while listening to
 //ModalResult values of the FMX form
 function TFmxVclForm.ShowModal: Integer;
@@ -180,16 +188,26 @@ begin
     Result := inherited ShowModal;
 end;
 
-
 //Overwrite message handling to grab changes to ModalResult
-procedure TFmxVclForm.WndProc(var msg: TMessage);
+//This did not do the job, because you could set ModalResult without triggering additional Messages (eg by keyboard)
+//procedure TFmxVclForm.WndProc(var msg: TMessage);
+//begin
+//  inherited;
+//  if (ModalResult = 0) and (Assigned(FForm)) and (FForm.ModalResult <> 0) then
+//    ModalResult := FForm.ModalResult;
+//end;
+
+//Update changes to ModalResult
+//this will not work, if the form never gets idle
+//A solution would be to add TFmxVclForm.WndProc again, but I doubt it is really necessary
+procedure TFmxVclForm.FormIdle(Sender: TObject; var Done: Boolean);
 begin
-  inherited;
   // get ModalResult of wrapped form. Otherwise TButton.ModalResult etc. wont work
   // VCL's ShowModal will check ModalResult in a loop where only Application.HandleMessage is called
   if (ModalResult = 0) and (Assigned(FForm)) and (FForm.ModalResult <> 0) then
     ModalResult := FForm.ModalResult;
 end;
+
 
 { TInterfacedFmxVclForm<T> }
 
