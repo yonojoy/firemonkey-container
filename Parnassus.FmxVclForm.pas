@@ -24,10 +24,18 @@ uses
 type
     TFmxFormClass = class of TCommonCustomForm;
 
+    //accessing FMX.Forms.TForm by Parnassus.TFmxForm will save a lot of trouble from needing to handle
+    //two different TForm classes correctly
+    //This way one only needs to include Parnassus.FmxVclForm, but not FMX.Forms
+    TFmxForm = FMX.Forms.TForm;
+    TFmxCustomForm = FMX.Forms.TCommonCustomForm;
+
+
     { Usage:
       TFmxVclForm.CreateNew(Owner, TOriginalForm).Show;
+      (derived from TForm (not from TCustomForm) to avoid problems with legacy code, that expects TForm descendand)
     --------------------------------------------------------------------------------------------------------------}
-    TFmxVclForm = class(Vcl.Forms.TCustomForm)
+    TFmxVclForm = class(Vcl.Forms.TForm)
     private
         FFormClass: TFmxFormClass;
         FForm: TCommonCustomForm;
