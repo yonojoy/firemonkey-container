@@ -101,12 +101,15 @@ begin
     // Use CreateNew instead of Create to create a form without using the associated .DFM file to initialize it.
     inherited CreateNew(AOwner);
     FFormClass := FormClass;
+
     //programmatically create FireMonkeyContainer
     FFireMonkeyContainer := TFireMonkeyContainer.Create(Self);
     FFireMonkeyContainer.Align := alClient;
+    FFireMonkeyContainer.AllowTabKey := True;
     FFireMonkeyContainer.OnCreateFMXForm := FireMonkeyContainerCreateFMXForm;
     FFireMonkeyContainer.OnDestroyFMXForm := FireMonkeyContainerDestroyFMXForm;
     FFireMonkeyContainer.Parent := Self;
+
     //create Form - this is necessary this early, because inherited classes may need this before
     //FireMonkeyContainerCreateFMXForm is called
     FForm := FFormClass.Create(Self);
