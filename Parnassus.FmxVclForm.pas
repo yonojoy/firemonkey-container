@@ -52,6 +52,8 @@ type
         procedure FormIdle(Sender: TObject; var Done: Boolean);
 
         function CloseQuery: Boolean; override;
+        procedure UpdateActions; override;
+
         {$HINTS OFF}
         constructor Create(AOwner: TComponent); override;
         {$HINTS ON}
@@ -90,6 +92,10 @@ uses
     SysUtils,
     TypInfo,
     Vcl.Controls;
+
+type
+    TCommonCustomFormCracker = class(TCommonCustomForm);
+
 
 constructor TFmxVclForm.Create(AOwner: TComponent);
 begin
@@ -208,6 +214,15 @@ begin
     if Assigned(FForm) then
       FForm.ModalResult := 0;
     Result := inherited ShowModal;
+end;
+
+procedure TFmxVclForm.UpdateActions;
+begin
+    //I think there is no need to call inherited UpdateActions (in this scenario) but I might be wrong:
+    //inherited;
+    if Assigned(FForm) then
+      //access protected function UpdateActions:
+      TCommonCustomFormCracker(FForm).UpdateActions();
 end;
 
 //Overwrite message handling to grab changes to ModalResult
