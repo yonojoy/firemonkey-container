@@ -51,6 +51,7 @@ type
         //procedure WndProc(var msg : TMessage); override;
         procedure FormIdle(Sender: TObject; var Done: Boolean);
 
+        function CloseQuery: Boolean; override;
         {$HINTS OFF}
         constructor Create(AOwner: TComponent); override;
         {$HINTS ON}
@@ -171,6 +172,16 @@ begin
     //VCL: TPosition =     (poDesigned, poDefault, poDefaultPosOnly, poDefaultSizeOnly, poScreenCenter, poDesktopCenter, poMainFormCenter, poOwnerFormCenter);
     Result := TPosition(APos);
 end;
+
+
+//The form should respect CloseQuery of the wrapped form
+function TFmxVclForm.CloseQuery: Boolean;
+begin
+    Result := inherited CloseQuery;
+    if Result and Assigned(FForm) and Assigned(FForm.OnCloseQuery) then
+      FForm.OnCloseQuery(Self, Result);
+end;
+
 
 function TFmxVclForm.PropGetFireMonkeyForm: TCommonCustomForm;
 begin
