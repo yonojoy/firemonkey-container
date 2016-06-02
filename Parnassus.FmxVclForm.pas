@@ -51,6 +51,9 @@ type
         //procedure WndProc(var msg : TMessage); override;
         procedure FormIdle(Sender: TObject; var Done: Boolean);
 
+        function CloseQuery: Boolean; override;
+        procedure UpdateActions; override;
+
         {$HINTS OFF}
         constructor Create(AOwner: TComponent); override;
         {$HINTS ON}
@@ -89,6 +92,10 @@ uses
     SysUtils,
     TypInfo,
     Vcl.Controls;
+
+type
+    TCommonCustomFormCracker = class(TCommonCustomForm);
+
 
 constructor TFmxVclForm.Create(AOwner: TComponent);
 begin
@@ -172,6 +179,16 @@ begin
     Result := TPosition(APos);
 end;
 
+
+//The form should respect CloseQuery of the wrapped form
+function TFmxVclForm.CloseQuery: Boolean;
+begin
+    Result := inherited CloseQuery;
+    if Result and Assigned(FForm) and Assigned(FForm.OnCloseQuery) then
+      FForm.OnCloseQuery(Self, Result);
+end;
+
+
 function TFmxVclForm.PropGetFireMonkeyForm: TCommonCustomForm;
 begin
     Result := FForm;
@@ -197,6 +214,15 @@ begin
     if Assigned(FForm) then
       FForm.ModalResult := 0;
     Result := inherited ShowModal;
+end;
+
+procedure TFmxVclForm.UpdateActions;
+begin
+    //I think there is no need to call inherited UpdateActions (in this scenario) but I might be wrong:
+    //inherited;
+    if Assigned(FForm) then
+      //access protected function UpdateActions:
+      TCommonCustomFormCracker(FForm).UpdateActions();
 end;
 
 //Overwrite message handling to grab changes to ModalResult
