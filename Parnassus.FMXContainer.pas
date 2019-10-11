@@ -729,8 +729,22 @@ begin
   // Now, behave as FMX does:
   // No need to call TranslateMessage(Message) first, TApplication.ProcessMessage does this
   if PeekMessage(Msg, 0, WM_CHAR, WM_CHAR, PM_REMOVE) then begin
-    Key := Msg.wParam;
-    KeyChar := Char(Msg.wParam);
+    //WORKAROUND:
+    //This is the original parnassus code but this does not work:
+    //if Ctrl+A is pressed I get 1
+    //if Ctrl+B is pressed I get 2, and so on
+    //I do not understand this - from documentation it should be 65, 66 (or nothing at all?)
+    if ssCtrl in Shift then
+    begin
+      //workaround
+      Key := Message.CharCode;
+      KeyChar := Char(Message.CharCode);
+    end
+    else begin
+      //original code
+      Key := Msg.wParam;
+      KeyChar := Char(Msg.wParam);
+    end;
     // Call again to remove any duplicate
     PeekMessage(Msg, 0, WM_CHAR, WM_CHAR, PM_REMOVE);
     FFMXForm.KeyDown(Key, KeyChar, Shift);
