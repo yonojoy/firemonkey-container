@@ -39,7 +39,9 @@ type
     private
         FFormClass: TFmxFormClass;
         FForm: TCommonCustomForm;
+        FFormAvailable: Boolean;    //is set after FireMonkeyContainerCreate / is unset after FireMonkeyContainerDestroy
         FAppEvents: TApplicationEvents;
+        function IsContainedFormAvailable(): Boolean;
     protected
         FFireMonkeyContainer: TFireMonkeyContainer;
         procedure FireMonkeyContainerCreateFMXForm(var Form: TCommonCustomForm);
@@ -117,6 +119,9 @@ begin
     FFireMonkeyContainer.OnDestroyFMXForm := FireMonkeyContainerDestroyFMXForm;
     FFireMonkeyContainer.Parent := Self;
 
+    //shield from unwanted windows / messages / errors
+    //this is set to true after FireMonkeyContainerCreateFMXForm
+    FFormAvailable := False;
     //create Form - this is necessary this early, because inherited classes may need this before
     //FireMonkeyContainerCreateFMXForm is called
     FForm := FFormClass.Create(Self);
@@ -141,11 +146,16 @@ procedure TFmxVclForm.FireMonkeyContainerCreateFMXForm(var Form: TCommonCustomFo
 begin
     if not Assigned(Form) then
       Form := FForm;
+    FFormAvailable := Assigned(FForm);  //= True!
 end;
 
 procedure TFmxVclForm.FireMonkeyContainerDestroyFMXForm(var Form: TCommonCustomForm;
   var Action: TCloseHostedFMXFormAction);
 begin
+    //remove reference to contained form:
+    FForm := nil;
+    FFormAvailable := False;
+    //propagate Destroy
     Action := fcaFree;
 end;
 
@@ -184,8 +194,12 @@ end;
 function TFmxVclForm.CloseQuery: Boolean;
 begin
     Result := inherited CloseQuery;
-    if Result and Assigned(FForm) and Assigned(FForm.OnCloseQuery) then
-      FForm.OnCloseQuery(Self, Result);
+    if Result and IsContainedFormAvailable() then
+    begin
+        Assert(Assigned(FForm));
+        if Assigned(FForm.OnCloseQuery) then
+          FForm.OnCloseQuery(Self, Result);
+    end;
 end;
 
 
@@ -199,11 +213,15 @@ end;
 //Workaround for issue #12 (Caret is gone after switching applications via taskbar)
 procedure TFmxVclForm.WMActivate(var Msg: TWMActivate);
 begin
-  if not (GetWindowLong(Handle, GWL_STYLE) and WS_CHILD = WS_CHILD) and (FormStyle <> fsMDIForm) then
-    if Msg.Active <> WA_INACTIVE then
-      FForm.Active := True;
-    //better??
-    //FForm.Active := (Msg.Active <> WA_INACTIVE);
+    if IsContainedFormAvailable() then
+    begin
+        if not (GetWindowLong(Handle, GWL_STYLE) and WS_CHILD = WS_CHILD) and (FormStyle <> fsMDIForm) then
+          if Msg.Active <> WA_INACTIVE then
+            //old:
+            //FForm.Active := True;
+            //better??
+            FForm.Active := (Msg.Active <> WA_INACTIVE);
+    end;
 end;
 
 //This function and TFmxVclForm.WndProc play together to allow ShowModal of the VCL form while listening to
@@ -211,7 +229,7 @@ end;
 function TFmxVclForm.ShowModal: Integer;
 begin
     //without this the form will close immediately once FForm ModalResult had been modified before
-    if Assigned(FForm) then
+    if IsContainedFormAvailable() then
       FForm.ModalResult := 0;
     Result := inherited ShowModal;
 end;
@@ -220,7 +238,7 @@ procedure TFmxVclForm.UpdateActions;
 begin
     //I think there is no need to call inherited UpdateActions (in this scenario) but I might be wrong:
     //inherited;
-    if Assigned(FForm) then
+    if IsContainedFormAvailable() then
       //access protected function UpdateActions:
       TCommonCustomFormCracker(FForm).UpdateActions();
 end;
@@ -239,11 +257,23 @@ end;
 //A solution would be to add TFmxVclForm.WndProc again, but I doubt it is really necessary
 procedure TFmxVclForm.FormIdle(Sender: TObject; var Done: Boolean);
 begin
-  // get ModalResult of wrapped form. Otherwise TButton.ModalResult etc. wont work
-  // VCL's ShowModal will check ModalResult in a loop where only Application.HandleMessage is called
-  if (ModalResult = 0) and (Assigned(FForm)) and (FForm.ModalResult <> 0) then
-    ModalResult := FForm.ModalResult;
+    // get ModalResult of wrapped form. Otherwise TButton.ModalResult etc. wont work
+    // VCL's ShowModal will check ModalResult in a loop where only Application.HandleMessage is called
+    if (ModalResult = 0) and IsContainedFormAvailable() then
+    begin
+        if FForm.ModalResult <> 0 then
+          ModalResult := FForm.ModalResult;
+    end;
 end;
+
+
+/// This returns true, if the contained FForm has been created and not yet been destroyed
+/// Background - shield from access violations in WMActivate  /  CloseQuery
+function TFmxVclForm.IsContainedFormAvailable: Boolean;
+begin
+    Result := Assigned(FForm) and FFormAvailable;
+end;
+
 
 
 { TInterfacedFmxVclForm<T> }
