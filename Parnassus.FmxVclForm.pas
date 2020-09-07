@@ -52,6 +52,7 @@ type
         procedure WMActivate(var Msg: TWMActivate); message WM_ACTIVATE;
         //procedure WndProc(var msg : TMessage); override;
         procedure FormIdle(Sender: TObject; var Done: Boolean);
+        function IsShortCut(var Msg: TWMKey): Boolean; override;
 
         function CloseQuery: Boolean; override;
         procedure UpdateActions; override;
@@ -237,7 +238,7 @@ end;
 procedure TFmxVclForm.UpdateActions;
 begin
     //I think there is no need to call inherited UpdateActions (in this scenario) but I might be wrong:
-    //inherited;
+    inherited;
     if IsContainedFormAvailable() then
       //access protected function UpdateActions:
       TCommonCustomFormCracker(FForm).UpdateActions();
@@ -274,7 +275,47 @@ begin
     Result := Assigned(FForm) and FFormAvailable;
 end;
 
+/// Without this function ALT+Key is not always properly dispatched
+function TFmxVclForm.IsShortCut(var Msg: TWMKey): Boolean;
+var
+    ShiftState: TShiftState;
+    Key: Word;
+    I: Integer;
+begin
+    Result := inherited IsShortCut(Msg);
+    if not Result and IsContainedFormAvailable() then
+    begin
+        //see Vcl.Controls:
+        ShiftState := KeyDataToShiftState(Msg.KeyData);
+        Key := Msg.CharCode;
 
+        //see IsDialogKey
+        if (ShiftState * [ssAlt, ssCtrl, ssCommand]) <> [] then
+        begin
+            //processed by the Form itself (eg F1)
+            if FForm.IsIControl then
+              FForm.AsIControl.DialogKey(Key, ShiftState);
+            if Key = 0 then
+            begin
+                Result := True;
+                Exit;
+            end;
+
+            //processed by the children of the form
+            //see TFmxForm.KeyDown
+            for i := FForm.ChildrenCount - 1 downto 0 do
+            begin
+                if FForm.Children[i].IsIControl then
+                  FForm.Children[i].AsIControl.DialogKey(Key, ShiftState);
+                if Key = 0 then
+                begin
+                    Result := True;
+                    Exit;
+                end;
+            end;
+        end;
+    end;
+end;
 
 { TInterfacedFmxVclForm<T> }
 
